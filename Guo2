@@ -1,0 +1,211 @@
+#import package
+import os
+import csv
+import pandas as pd
+import numpy as np
+import matplotlib
+import math
+import scipy
+import re
+from scipy import *
+import openpyxl
+#%matplotlib notebook
+from matplotlib.font_manager import FontProperties
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+import statsmodels.api as sm
+from matplotlib import rc
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
+matplotlib.rcParams['text.usetex'] = True
+matplotlib.rcParams['text.latex.unicode'] = True
+from scipy.optimize import curve_fit
+path = r'D:\lab\2019.8.24_lab_data\2020.1.15_P-MPNS _350℃_10min'
+
+#see files
+entries = os.listdir(path)
+txtlist = [x for x in entries if x.endswith('.txt')]
+print(txtlist)
+CV_list = [x for x in txtlist if x.startswith('CV')]
+print(CV_list)
+numCV = len(CV_list)
+EIS_list = [x for x in txtlist if x.startswith('EIS')]
+print(EIS_list)
+numEIS = len(EIS_list)
+LSV_list = [x for x in txtlist if x.startswith('LSV')]
+print(LSV_list)
+numLSV = len(LSV_list)
+
+#C-V curves
+a = range(numCV)
+for x in a:
+    Path = path + '\\' + CV_list[x]
+    n2 = CV_list[x].split('-')
+    n1 = n2[1].split('.t')
+    name = n1[0]
+    Pathn = path + '\\' + 'CV-' + name
+    with open(Path,'r',encoding='gbk')as f:
+        lines = f.readlines()
+    ge = ['=',':','y']
+    new = ''
+    for line in lines:
+        mode = True
+        for i in ge:
+            if i in line:
+                mode = False
+                break
+        if mode:
+            new += line
+    with open(Path,'w')as f:
+        f.write(new)
+    data = pd.read_table(Path, sep=',')
+    data.head()
+    Potential = data['Potential/V'].values
+    Current = data[' Current/A'].values
+    N = 0
+    for x in Potential:
+        if x == Potential[0]:
+            N = N+1
+    l = len(Potential)
+    n = l//N
+    X = Potential[l-n:]
+    Y = Current[l-n:]
+    fig, ax = plt.subplots(figsize=(12,5))
+    ax.plot(X,Y)
+    %config InlineBackend.figure_format = 'retina'
+    ax.set_xlabel(r'$Potential/V$',fontsize=16)
+    ax.set_ylabel(r'$Current/A$',fontsize=16)
+    ax.grid(linestyle="--", alpha=0.3)
+    ax.tick_params(direction='in')
+    ax.set_title(r'$C-V$',fontsize=18)
+    xline = -0.8                                   #竖直线x坐标
+    miny = Current.min() - 0.05
+    maxy = Current.max() + 0.05
+    minx = Potential.min() - 0.05
+    maxx = Potential.max() + 0.05
+    ax.axis([minx, maxx, miny, maxy])
+    ax.vlines(xline, miny, maxy)
+    PATH = Pathn + '.jpg'
+    plt.savefig(PATH, dpi=None, quality = 100, facecolor='w', edgecolor='w',
+        orientation='portrait', papertype=None, format=None,
+        transparent=False, bbox_inches=None, pad_inches=0.1,
+        metadata=None)
+#EIS
+b = range(numEIS) 
+for x in b:
+    Path = path + '\\' + EIS_list[x]
+    n2 = EIS_list[x].split('-')
+    n1 = n2[1].split('.t')
+    name = n1[0]
+    Pathn = path + '\\' + 'EIS-' + name
+    with open(Path,'r',encoding='gbk')as f:
+        lines = f.readlines()
+    ge = ['c','n','u','I','N','l',':']
+    new = ''
+    for line in lines:
+        mode = True
+        for i in ge:
+            if i in line:
+                mode = False
+                break
+        if mode:
+            new += line
+    with open(Path,'w')as f:
+        f.write(new)
+    data = pd.read_table(Path, sep=',')
+    data.head()
+    Freq = data['Freq/Hz'].values
+    Z1 = data[" Z'/ohm"].values
+    Z2 = data[' Z"/ohm'].values
+    Z = data[' Z/ohm'].values
+    Phase = data[' Phase/deg'].values
+    print(Z.shape)
+    
+    fig, ax = plt.subplots(figsize=(8,5))
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    ax.scatter(Z1,-Z2)
+    %config InlineBackend.figure_format = 'retina'
+    ax.set_xlabel(r"$Z^{\prime}/ohm$",fontsize=16)
+    ax.set_ylabel(r'$-Z^{\prime\prime}/ohm$',fontsize=16)
+    ax.grid(linestyle="--", alpha=0.3)
+    ax.tick_params(direction='in')
+    ax.set_title(r'$EIS$',fontsize=18)
+    yline = 0                                    #水平线y坐标
+    z = -Z2 
+    miny = z.min() - 0.05                        #图刻度线范围
+    maxy = z.max() + 0.05
+    minx = Z1.min() - 0.05
+    maxx = Z1.max() + 0.05
+    ax.axis([minx, maxx, miny, maxy])
+    ax.hlines(yline, minx, maxx)
+    PATH = Pathn + '.jpg'
+    plt.savefig(PATH, dpi=None, facecolor='w', quality = 100, edgecolor='w',
+        orientation='portrait', papertype=None, format=None,
+        transparent=False, bbox_inches=None, pad_inches=0.1,
+        metadata=None)
+
+#LSV
+c =  range(numLSV)
+for x in c:
+    Path = path + '\\' + LSV_list[x]
+    n2 = EIS_list[x].split('-')
+    n1 = n2[1].split('.t')
+    name = n1[0]
+    Pathn= path + '\\' + 'LSV-' + name
+    with open(Path,'r',encoding='gbk')as f:
+        lines = f.readlines()
+    ge = [':','y','=']
+    new = ''
+    for line in lines:
+        mode = True
+        for i in ge:
+            if i in line:
+                mode = False
+                break
+        if mode:
+            new += line
+    with open(Path,'w')as f:
+        f.write(new)
+    data = pd.read_table(Path, sep=',')
+    data.head()
+    P = data['Potential/V'].values
+    C = data[' Current/A'].values
+    R_ct = 1.45                                   #R_ct
+    V_c = 0.8935                                  #参比极电压
+    Y = P - C * R_ct + V_c                        #运算
+    X1 = C * 1000
+    X = np.log(np.abs(X1))
+    fig, ax = plt.subplots(figsize=(12,5))
+    ax.plot(X,Y)
+    %config InlineBackend.figure_format = 'retina'
+    ax.set_xlabel(r'$Potential/V$',fontsize=16)
+    ax.set_ylabel(r'$Current/A$',fontsize=16)
+    ax.grid(linestyle="--", alpha=0.3)
+    ax.tick_params(direction='in')
+    ax.set_title(r'$LSV$',fontsize=18)
+    PATH = Pathn + '.jpg'
+    plt.savefig(PATH, dpi=None, quality = 100, facecolor='w', edgecolor='w',
+        orientation='portrait', papertype=None, format=None,
+        transparent=False, bbox_inches=None, pad_inches=0.1,
+        metadata=None)
+    Ymax = 0.08                                         #选取的纵坐标最大值
+    Ymin = -0.15                                        #选取的纵坐标最小值
+    len_Y = len(Y)
+    Yr = range(len_Y)
+    for m in Yr:
+        if Y[m] > Ymax:
+            nYm = m
+        if Y[m] > Ymin:
+            nYmi = m
+    Y2 = Y[nYm:nYmi]
+    X2 = X[nYm:nYmi]
+    fig, ax = plt.subplots(figsize=(12,5))
+    ax.plot(X2,Y2)
+    %config InlineBackend.figure_format = 'retina'
+    ax.set_xlabel(r'$Potential/V$',fontsize=16)
+    ax.set_ylabel(r'$Current/A$',fontsize=16)
+    ax.grid(linestyle="--", alpha=0.3)
+    ax.tick_params(direction='in')
+    ax.set_title(r'$LSV$',fontsize=18)
