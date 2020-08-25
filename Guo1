@@ -1,0 +1,318 @@
+#import package
+import os
+import pandas as pd
+import numpy as np
+import matplotlib
+import math
+import scipy
+import re
+import openpyxl
+#%matplotlib notebook
+from matplotlib.font_manager import FontProperties
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+import statsmodels.api as sm
+from matplotlib import rc
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
+from scipy.optimize import curve_fit
+path = r'D:\lab\123\2020.7.23 NiO 绿粉 400℃ 30min 1M KOH完整，测XRD样品'
+PATHG = path + '\GCD'
+
+#see files
+entries = os.listdir(path)
+txtlist = [x for x in entries if x.endswith('.txt')]
+print(txtlist)
+CV_list = [x for x in txtlist if x.startswith('CV')]
+print(CV_list)
+numCV = len(CV_list)
+EIS_list = [x for x in txtlist if x.startswith('EIS')]
+print(EIS_list)
+numEIS = len(EIS_list)
+entriesG = os.listdir(PATHG)
+txtlistG = [x for x in entriesG if x.endswith('.txt')]
+#GCD_list = [x for x in txtlistG if x.startswith('GCD')]
+GCD_list = txtlistG
+numGCD = len(GCD_list)
+print(GCD_list)
+
+#C-V curve
+Molmass = 87                            #摩尔质量（可能需要修改）
+cha = 3                                 #变价量（可能需要修改）
+Voltage = 0.02                          #电压（可能需要修改）
+Mass = Molmass/(cha * 1.6 * 6.02 * 10)   #质量（可能需要修改）
+a = list(range(numCV))
+Scan = np.zeros(numCV)
+Integ = np.zeros(numCV)
+C = np.zeros(numCV)
+names = []
+
+def Integrate(a,b):
+    z = np.arange(len(a))
+    S = 0
+    for m in z:
+        if m < len(a)-1:
+            S = S + 0.5 * (b[m] + b[m + 1]) * (a[m] - a[m + 1])
+    return abs(S)
+for x in a:
+    Path = path + '\\' + CV_list[x]
+    n2 = CV_list[x].split('-')
+    n1 = n2[1].split('.t')
+    name = n1[0]
+    Scan[x] = eval(name.split('mV')[0])
+    names.append(name)
+    Pathn = path + '\\' + 'CV-' + name
+    with open(Path,'r',encoding='gbk')as f:
+        lines = f.readlines()
+    ge = ['=',':','y']
+    new = ''
+    for line in lines:
+        mode = True
+        for i in ge:
+            if i in line:
+                mode = False
+                break
+        if mode:
+            new += line
+    with open(Path,'w')as f:
+        f.write(new)
+    data = pd.read_table(Path, sep=',')
+    data.head()
+    Potential = data['Potential/V'].values
+    Current = data[' Current/A'].values
+    N = 0
+    for b in Potential:
+        if b == Potential[0]:
+            N = N+1
+    l = len(Potential)
+    n = l//(N)
+    X = Potential[l-n-1:]     
+    Y = Current[l-n-1:]
+    PATH = Pathn + '.jpg'
+    Integ[int(x)] = Integrate(X, Y)
+    C[int(x)] = Integ[int(x)] * 1000 * 1000 /(Scan[int(x)] * Mass * Voltage * 2)#电容的运算其中Scan为扫速，Integ[]为积分结果Mass与Voltage在单元开头定义
+%config InlineBackend.figure_format = 'retina'
+fig, ax = plt.subplots(figsize=(12,5))
+ax.set_xlabel(r'$Potential/V$',fontsize=16)                    #第一个图横坐标
+ax.set_ylabel(r'$Current/A$',fontsize=16)                      #第二个图纵坐标   
+ax.grid(linestyle="--", alpha=0.3)
+ax.tick_params(direction='in')
+ax.set_title(r'$C-V$',fontsize=18)                             #题目
+def fin(Potential,Current):
+    N = 0
+    for b in Potential:
+        if b == Potential[0]:
+            N = N+1
+    l = len(Potential)
+    n = l//(N)
+    X = Potential[l-n-1:]
+    Y = Current[l-n-1:]
+    return X, Y
+if numCV == 1:
+    Path = path + '\\' + CV_list[0];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p1, = ax.plot(Potential, Current)
+    ax.legend([p1], names, loc='lower right')
+if numCV == 2:
+    Path = path + '\\' + CV_list[0];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p1, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[1];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p2, = ax.plot(Potential, Current)
+    ax.legend([p1, p2], names, loc='lower right')
+if numCV == 3:
+    Path = path + '\\' + CV_list[0];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p1, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[1];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p2, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[2];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p3, = ax.plot(Potential, Current)
+    ax.legend([p1, p2, p3], names, loc='lower right')
+if numCV == 4:
+    Path = path + '\\' + CV_list[0];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p1, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[1];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p2, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[2];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p3, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[3];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p4, = ax.plot(Potential, Current)
+    ax.legend([p1, p2, p3, p4], names, loc='lower right')
+if numCV == 5:
+    Path = path + '\\' + CV_list[0];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p1, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[1];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p2, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[2];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p3, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[3];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p4, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[4];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p5, = ax.plot(Potential, Current)
+    ax.legend([p1, p2, p3, p4, p5], names, loc='lower right')
+if numCV == 6:
+    Path = path + '\\' + CV_list[0];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p1, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[1];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p2, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[2];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p3, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[3];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p4, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[4];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p5, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[5];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p6, = ax.plot(Potential, Current)
+    ax.legend([p1, p2, p3, p4, p5, p6], names, loc='lower right')
+if numCV == 7:
+    Path = path + '\\' + CV_list[0];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p1, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[1];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p2, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[2];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p3, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[3];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p4, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[4];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p5, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[5];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p6, = ax.plot(Potential, Current)
+    Path = path + '\\' + CV_list[6];data = pd.read_table(Path, sep=',');data.head();Potential = data['Potential/V'].values;Current = data[' Current/A'].values;Potential, Current = fin(Potential,Current);p7, = ax.plot(Potential, Current)
+    ax.legend([p1, p2, p3, p4, p5, p6, p7], names, loc='lower right')
+plt.savefig(PATH, dpi=None, quality = 100, facecolor='w', edgecolor='w',
+        orientation='portrait', papertype=None, format=None,
+        transparent=False, bbox_inches=None, pad_inches=0.1,
+        metadata=None)
+fig, ax = plt.subplots(figsize=(12,5))
+print(C)
+dic = {x:y for x,y in zip(Scan.tolist(),C.tolist())}
+dic= sorted(dic.items(), key=lambda x:x[0])
+print(dic)
+Scan = np.array([x[0] for x in dic])
+C = np.array([y[1] for y in dic])
+ax.plot(Scan, C)
+ax.set_xlabel(r'$Potential/V vs. (Ag/AgCl)$',fontsize=16)          #第二个图横坐标
+ax.set_ylabel(r'$Current(A/g)$',fontsize=16)                       #第二个图纵坐标
+ax.grid(linestyle="--", alpha=0.3)
+ax.tick_params(direction='in')
+ax.set_title(r'$C-V$',fontsize=18)                                  #题目
+plt.savefig(PATH, dpi=None, quality = 100, facecolor='w', edgecolor='w',
+        orientation='portrait', papertype=None, format=None,
+        transparent=False, bbox_inches=None, pad_inches=0.1,
+        metadata=None)
+
+#EIS
+b = range(numEIS) 
+for x in b:
+    Path = path + '\\' + EIS_list[x]
+    n2 = EIS_list[x].split('-')
+    n1 = n2[1].split('.t')
+    name = n1[0]
+    Pathn = path + '\\' + 'EIS-' + name
+    with open(Path,'r',encoding='gbk')as f:
+        lines = f.readlines()
+    ge = ['c','n','u','I','N','l',':']
+    new = ''
+    for line in lines:
+        mode = True
+        for i in ge:
+            if i in line:
+                mode = False
+                break
+        if mode:
+            new += line
+    with open(Path,'w')as f:
+        f.write(new)
+    data = pd.read_table(Path, sep=',')
+    data.head()
+    Freq = data['Freq/Hz'].values
+    Z1 = data[" Z'/ohm"].values
+    Z2 = data[' Z"/ohm'].values
+    Z = data[' Z/ohm'].values
+    Phase = data[' Phase/deg'].values
+    fig, ax = plt.subplots(figsize=(8,5))
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    ax.plot(Z1,-Z2)
+    %config InlineBackend.figure_format = 'retina'
+    ax.set_xlabel(r"$Z^{\prime}/\Omega$",fontsize=16)                #横坐标
+    ax.set_ylabel(r'$-Z^{\prime\prime}/\Omega$',fontsize=16)         #纵坐标
+    ax.grid(linestyle="--", alpha=0.3)
+    ax.tick_params(direction='in')
+    ax.set_title(r'$EIS$',fontsize=18)                            #题目
+    PATH = Pathn + '.jpg' 
+    plt.savefig(PATH, dpi=None, facecolor='w', quality = 100, edgecolor='w',
+        orientation='portrait', papertype=None, format=None,
+        transparent=False, bbox_inches=None, pad_inches=0.1,
+        metadata=None)
+        
+#GCD
+c = range(numGCD) 
+def find(t, V):
+    rang = np.arange(len(t)-4)
+    for term in rang:
+        if V[term] > V[term+1] and V[term + 1] < V[term + 2]:
+            if  V[term - 2] > V[term -1] and V[term + 2] < V[term + 3]:
+                N = term + 1
+                break
+    N1 = len(t) - N - 2
+    t1 = t[:N]
+    V1 = V[:N]
+    return t1, V1
+names = []
+for x in c:
+    Path = PATHG + '\\' + GCD_list[x]
+    #n2 = GCD_list[x].split('-')
+    n1 = GCD_list[x].split('.t')
+    name = n1[0]
+    names.append(name)
+    Pathn = path + '\\' + 'GCD-' + name
+    with open(Path,'r',encoding='gbk')as f:
+        lines = f.readlines()
+    ge = ['=','y',':']
+    new = ''
+    for line in lines:
+        mode = True
+        for i in ge:
+            if i in line:
+                mode = False
+                break
+        if mode:
+            new += line
+    with open(Path,'w')as f:
+        f.write(new)
+fig, ax = plt.subplots(figsize=(12,5))
+ax.set_xlabel(r'$Time(s)$',fontsize=16)                         #横坐标
+ax.set_ylabel(r'$Voltage(V)$',fontsize=16)                      #纵坐标   
+ax.grid(linestyle="--", alpha=0.3)
+ax.tick_params(direction='in')
+ax.set_title(r'$C-V$',fontsize=18)                            #题目
+print(numGCD)
+if numGCD == 1:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    ax.legend([p1], names, loc='upper right')
+if numGCD == 2:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[1];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p2, = ax.plot(t, V)
+    ax.legend([p1, p2], names, loc='upper right')
+if numGCD == 3:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[1];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p2, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[2];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p3, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[3];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p4, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[4];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p5, = ax.plot(t, V)
+    ax.legend([p1, p2, p3], names, loc='upper right')
+if numGCD == 4:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[1];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p2, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[2];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p3, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[3];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p4, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[4];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p5, = ax.plot(t, V)
+    ax.legend([p1, p2, p3, p4], names, loc='upper right')
+if numGCD == 5:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[1];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p2, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[2];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p3, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[3];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p4, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[4];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p5, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[5];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p6, = ax.plot(t, V)
+    ax.legend([p1, p2, p3, p4, p5], names, loc='upper right')
+if numGCD == 6:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[1];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p2, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[2];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p3, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[3];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p4, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[4];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p5, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[5];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p6, = ax.plot(t, V)
+    ax.legend([p1, p2, p3, p4, p5, p6], names, loc='upper right')
+if numGCD == 7:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[1];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p2, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[2];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p3, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[3];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p4, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[4];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p5, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[5];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p6, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[6];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p7, = ax.plot(t, V)
+    ax.legend([p1, p2, p3, p4, p5, p6, p7], names, loc='upper right')
+if numGCD == 8:
+    Path = PATHG + '\\' + GCD_list[0];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p1, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[1];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p2, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[2];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p3, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[3];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p4, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[4];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p5, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[5];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p6, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[6];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p7, = ax.plot(t, V)
+    Path = PATHG + '\\' + GCD_list[7];data = pd.read_table(Path, sep=',');data.head();t = data['Time/sec'].values;V = data[" Potential/V"].values;t, V = find(t, V);p8, = ax.plot(t, V)
+    ax.legend([p1, p2, p3, p4, p5, p6, p7, p8], names, loc='upper right')
