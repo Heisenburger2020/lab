@@ -1,0 +1,217 @@
+#import package
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
+from matplotlib import rc
+import matplotlib
+import numpy as np
+import cv2
+import os
+from scipy.special import genlaguerre
+import math
+from moviepy.video.io.bindings import mplfig_to_npimage
+import moviepy.editor as mpy
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
+
+#rotate the map
+def rotate_map(theta, n, N):
+    X, Y = np.mgrid[-20:20:complex(0, N), -20:20:complex(0, N)]
+    M = X * np.cos(theta) + Y * np.sin(theta)
+    N = -X * np.sin(theta) + Y * np.cos(theta)
+    theta = n * np.arctan2(M,N)
+    In = np.mod(theta, 2* np.pi)
+    return In, X, Y
+    
+#create and save a plot
+N = 1000
+PATH = r'C:\Users\86186\Desktop\DL\3.jpg'
+X, Y = np.mgrid[-3:3:complex(0, N), -3:3:complex(0, N)]
+I1=(np.arctan2(Y,X))/(2*np.pi)
+fig, ax = plt.subplots(figsize=(5, 5))
+im = ax.pcolormesh(X, Y, I1,cmap='binary')
+ax.axis('off')
+plt.savefig(r'C:\Users\86186\Desktop\DL\3.jpg', dpi=None, quality = 100, facecolor=None, edgecolor=None,
+        orientation='portrait', papertype=None, format=None,
+        transparent=False, bbox_inches=None, pad_inches=None,
+        metadata=None)
+img = cv2.imread(r'C:\Users\86186\Desktop\DL\3.jpg')
+plt.imshow(cv2.resize(img,(128, 128)))
+
+#generate training set
+PATH = r'C:\Users\86186\Desktop\DL\OAM training\training'
+N = 300
+flag = 0
+for n in np.arange(1,11,1):
+    for i in np.arange(0, 1, 0.01):
+        rthe = i * 2 * np.pi
+        In, X, Y = rotate_map(rthe, n, N)
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.axis('off')
+        im = ax.pcolormesh(X, Y, In,cmap='binary')
+        flag +=1
+        name = str(n) + '_' + str(flag) + '.jpg'
+        plt.savefig(os.path.join(PATH, name), dpi=None, quality = 100, facecolor='w', edgecolor='w',
+                     orientation='portrait', papertype=None, format='jpg',
+                     transparent=False, bbox_inches=None, pad_inches=None,
+                     metadata=None)
+
+#generate test set
+PATH = r'C:\Users\86186\Desktop\DL\OAM training\testing'
+N = 300
+flag = 0
+for n in np.arange(1,11,1):
+    for i in np.arange(0, 1, 0.1):
+        rthe = i * 2 * np.pi
+        In, X, Y = rotate_map(rthe, n, N)
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.axis('off')
+        im = ax.pcolormesh(X, Y, In,cmap='binary')
+        flag +=1
+        name = str(n) + '_' + str(flag) + '.jpg'
+        plt.savefig(os.path.join(PATH, name), dpi=None, quality = 100, facecolor='w', edgecolor='w',
+                     orientation='portrait', papertype=None, format='jpg',
+                     transparent=False, bbox_inches=None, pad_inches=None,
+                     metadata=None)
+
+#generate LG light
+def LG3(l, p, w0, r, theta):
+    "l p w0 r theta"
+    a = np.sqrt(2) * r / w0
+    b = abs(l)
+    term1 = np.sqrt((2*math.factorial(p))/(np.pi*math.factorial(p+b)))
+    term2 = genlaguerre(p,b,monic=True)(a**2)
+    term3 = np.exp(-1*l*complex(0,1)*theta)
+    term4 = np.exp(-1*(a**2)/2)
+    term5 = (a**b)*((-1)**p)/(w0)
+    u = term1 * term2 * term3 * term4 * term5
+    return u
+
+#genlaguerre(n, l)
+#欲画出双LG光束叠加态的相位分布图
+l1 = 3
+l2 = 3
+n1 = 1
+n2 = 3
+m = 5
+N = 1000
+w0 = 0.3
+X, Y = np.mgrid[-m:m:complex(0, N), -m:m:complex(0, N)]
+theta = np.arctan2(Y,X)
+r = np.sqrt(X ** 2 + Y ** 2)
+p = 2 * r ** 2
+u = LG(l1,n1,w0,r,theta) + LG(l2,n2,w0,r,theta)
+I=(np.mod(np.angle(u), 2* np.pi)+np.pi)/(2*np.pi)
+fig, ax = plt.subplots(figsize=(5, 5))
+ax.tick_params(direction='in')
+im = ax.pcolormesh(X, Y, I,cmap='binary')
+plt.axis([-2, 2, -2, 2])
+%config InlineBackend.figure_format = 'retina'
+
+#欲画出偏心的相位分布图
+l1 = 3
+l2 = 3
+n1 = 1
+n2 = 3
+m = 5
+a = 0.01
+N = 1000
+w0 = 0.3
+X, Y = np.mgrid[-m:m:complex(0, N), -m:m:complex(0, N)]
+X1, Y1  = np.mgrid[-m-a:m-a:complex(0, N), -m-a:m-a:complex(0, N)]
+theta = np.arctan2(Y,X)
+theta1 = np.arctan2(Y1,X1)+np.pi/3
+r = np.sqrt(X ** 2 + Y ** 2)
+r1 = np.sqrt(X1 ** 2 + Y1 ** 2)
+p = 2 * r ** 2
+u = LG(l1,n1,w0,r,theta) + LG(l1,n1,w0,r1,theta1)
+I=(np.mod(np.angle(u), 2* np.pi)+np.pi)/(2*np.pi)
+fig, ax = plt.subplots(figsize=(5, 5))
+ax.tick_params(direction='in')
+im = ax.pcolormesh(X, Y, I,cmap='binary')
+plt.axis([-2, 2, -2, 2])
+%config InlineBackend.figure_format = 'retina'
+
+#两束偏心激光光强分布
+l2 = 3
+n2 = 0
+l1 = 3
+n1 = 3
+m = 8
+b = 0.01
+N = 1000
+w0 = 1
+X, Y = np.mgrid[-m:m:complex(0, N), -m:m:complex(0, N)]
+X1, Y1 = np.mgrid[-m+b:m+b:complex(0, N), -m+b:m+b:complex(0, N)]
+theta = np.arctan2(Y,X)
+theta1 = np.arctan2(Y1,X1)
+r = np.sqrt(X ** 2 + Y ** 2)
+r1 = np.sqrt(X1 ** 2 + Y1 ** 2)
+u = LG3(l1,n1,w0,r,theta) + LG3(l1,n1,w0,r1,theta1)
+I2 = u * np.conjugate(u)
+fig, ax = plt.subplots(figsize=(5, 5))
+im = ax.pcolormesh(X, Y, I2.real,cmap='gray')
+
+#制作两束偏心激光相干汇聚的动画
+from moviepy.video.io.bindings import mplfig_to_npimage
+import moviepy.editor as mpy
+duration = 20
+l1 = 3
+l2 = 3
+n1 = 1
+n2 = 3
+def labplot1(a):
+    m = 5
+    N = 1000
+    w0 = 0.3
+    l1 = 3
+    l2 = 3
+    n1 = 1
+    n2 = 3
+    X, Y = np.mgrid[-m:m:complex(0, N), -m:m:complex(0, N)]
+    X1, Y1  = np.mgrid[-m-a:m-a:complex(0, N), -m-a:m-a:complex(0, N)]
+    theta = np.arctan2(Y,X)
+    theta1 = np.arctan2(Y1,X1)+np.pi/3
+    r = np.sqrt(X ** 2 + Y ** 2)
+    r1 = np.sqrt(X1 ** 2 + Y1 ** 2)
+    p = 2 * r ** 2
+    u = LG(l1,n1,w0,r,theta) + LG(l1,n1,w0,r1,theta1)
+    I=(np.mod(np.angle(u), 2* np.pi)+np.pi)/(2*np.pi)
+    return I
+fig_mpl, ax = plt.subplots(figsize=(5, 5))
+ax.tick_params(direction='in')
+line  = ax.pcolormesh(X, Y, labplot1(0),cmap='binary')
+plt.axis([-2, 2, -2, 2])
+%config InlineBackend.figure_format = 'retina'
+def make_frame_mpl(t):
+    ax.pcolormesh(X, Y, labplot1(0.05*t),cmap='binary')  # 更新曲面
+    return mplfig_to_npimage(fig_mpl) # 图形的RGB图像
+animation =mpy.VideoClip(make_frame_mpl, duration=duration)
+animation.write_gif("sinc_mpl.gif", fps=20)
+
+#涡旋光束真空中传播一段距离(this can take some time)
+def LightPropFun(E1, k, z, X, Y):
+    "E:z=0时电场分布，k:波矢，z:传播距离"
+    term1 = -1 * complex(0, 1) * k / (2 * np.pi * z)
+    term2 = np.exp(complex(0, 1) * k * z)
+    E2 = np.zeros(E1.shape,dtype=complex)
+    d = X[1, 0] - X[0, 0]
+    for i in np.arange(E1.shape[0]):
+        for j in np.arange(E1.shape[1]):
+            for m in np.arange(E1.shape[0]):
+                for n in np.arange(E1.shape[1]):
+                    r = (X[i,j] - X[m,n]) ** 2 + (Y[i,j] - Y[m,n]) ** 2
+                    E2[i, j] += E1[m, n]*np.exp(1j*k*r/(2*z)) * d**2
+    E = term1 * term2 * E2
+    return E     
+m = 16
+N = 500
+w0 = 1
+l2 = 1
+n2 = 0
+X, Y = np.mgrid[-m:m:complex(0, N), -m:m:complex(0, N)]
+theta = np.arctan2(Y,X)
+r = np.sqrt(X ** 2 + Y ** 2)
+u = LG3(l2,n2,w0,r,theta)
+E = LightPropFun(u,1,10,X,Y )
+fig, ax = plt.subplots(figsize=(5, 5))
+im = ax.pcolormesh(X, Y, np.angle(E),cmap='gray')
